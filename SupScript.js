@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 const OPM = require("./operatormatch")
+const fs = require("fs")
 const ds = require("./DeepSlate")
 
 function MyAST(code) {
@@ -42,9 +43,15 @@ function MyAST(code) {
     state = 0
     temp_buf = "";
     for (let i =0 ;i < ctx.length ; ++ i) {
-        if (ctx[i] == '.' && state == 0) {
+        if (ctx[i] == ',' && state == 0) {
             argar.push(temp_buf.trim())
             temp_buf = "";
+        } else if (ctx[i] == '"' && state == 0) {
+            state = 10; 
+            temp_buf += '"' 
+        } else if (ctx[i] == '"' && state == 10) {
+            state =0;  
+            temp_buf += '"'
         } else {
             temp_buf += ctx[i]
         }
@@ -68,11 +75,31 @@ function std_add(a) {
     return a[0] + a[1]
 }
 
-let mymem = {
+function std_values_new(a) {
+    eval("var " + a[0] + " = '" + a[1] + "'")
+}
+
+var mymem = {
     'std': {
         'print': b_print,
         "math": {
             "add": std_add
+        },
+        "values": {
+            'new': std_values_new
+        },
+        'os': {
+            'error': function(args) {
+                console.error(args[0])
+            }
+        },
+        'fs': {
+            'write': function (args) {
+                fs.writeFileSync(args[0], args[1])
+            }
+        },
+        'java': {
+            'eval': eval
         }
     },
     'test': b_print
@@ -92,16 +119,25 @@ function Myeval(str) {
     let ast = MyAST(str)
     // console.log(ast.fun)
     // console.log(ast)
+    try {
+        return eval(str)
+    } catch (e)  {
     if (typeof ast == 'string') {
         if (ds.traverse(mymem, ast) != null) return ds.traverse(mymem, ast)
         return ast
     };
+
     for (let i = 0; i < ast["args"].length ; ++i) {
         
         ast.args[i] = eval(Myeval(ast.args[i]))
     }
+    // console.log(typeof ds.traverse(mymem, ast.fun))
+    // if (typeof ds.traverse(mymem, ast.fun == 'object')) return (ds.traverse(mymem, ast.fun))
+
     
     return ds.traverse(mymem, ast.fun)(ast.args)
+
+    }
 }
 module.exports.eval = Myeval;
 
